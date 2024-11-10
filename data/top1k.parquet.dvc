@@ -1,0 +1,5 @@
+outs:
+- md5: 7e67c5a3cb55a084b586cb95afcfe004
+  size: 52432170
+  hash: md5
+  path: top1k.parquet
