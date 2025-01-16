@@ -21,6 +21,7 @@ data = pd.read_parquet("data/data.parquet")
 # OneHotEncoder #######################################################################
 le = LabelBinarizer()
 labels = le.fit_transform(data[label_col])  # np array of onehotencoded lables.
+labels.dump("models/labels.keras")
 type(labels), labels.shape
 # np.unique(labels)
 num_classes = labels.shape[1]
@@ -28,6 +29,12 @@ num_classes = labels.shape[1]
 # Tokenize ############################################################################
 token_vector_max_lenght = 256
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")  #  WordPiece: BERT
+# # Tokenize the text data
+# Load a pre-trained transformer model (e.g., DistilBERT for text classification)
+# tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+# model = TFAutoModelForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=num_classes)
+# train_encodings = tokenizer(list(df['text_column']), truncation=True, padding=True, max_length=256)
+# val_encodings = tokenizer(list(df['val_text_column']), truncation=True, padding=True, max_length=256)
 tk = partial(
     tokenizer.encode_plus,
     padding="max_length",
@@ -39,7 +46,7 @@ text_inputs = np.stack(data[text_col].apply(lambda x: tk(x)["input_ids"]).values
 
 type(text_inputs), text_inputs.shape
 text_inputs = text_inputs.astype("int32")  # Convert to correct types
-labels = labels.astype("float32")
+labels = labels.astype("int32")
 
 # train_test_split ###################################################################
 X_train, X_test, y_train, y_test = train_test_split(
@@ -67,12 +74,15 @@ network.add(Dropout(0.5))
 
 # Output Layer
 # Softmax is needed for more than 2 classes
-network.add(Dense(num_classes, activation="softmax"))
+network.add(Dense(num_classes, activation="softmax" if num_classes > 2 else "sigmoid"))
+
 
 # Compile the network
 optimizer = Adam(learning_rate=3e-5)
 network.compile(
-    optimizer=optimizer, loss="sparse_categorical_crossentropy", metrics=["accuracy"]
+    optimizer=optimizer,
+    loss="categorical_crossentropy" if num_classes > 2 else "binary_crossentropy",
+    metrics=["accuracy"],
 )
 network.summary()
 
@@ -112,8 +122,4 @@ accuracy = (pred_classes == true_classes).mean()
 print(f"\nAccuracy: {accuracy:.2%}")
 
 # dump model
-network.save("models/network.h5")
-from joblib import dump
-
-# Load the saved LabelBinarizer object
-dump(le, "models/label_binarizer.joblib")
+network.save("models/network.keras")

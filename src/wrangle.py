@@ -4,6 +4,7 @@ from lib import standardize_text
 text_col = "Descripción de la mercancía"
 label_col = "Tarifario"
 df = pd.read_parquet("data/top1k.parquet")
+df = df.loc[df[label_col] != "2711120100"]
 
 # Dedup
 df.loc[:, text_col] = df[text_col].apply(lambda x: standardize_text(x))
