@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import List
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer
@@ -26,6 +27,7 @@ class NeuralNetwork:
         self.x_inputs = []
         self.__tokenizer = "bert-base-uncased"
         self.__autotokenizer = None
+        self.batch_size = 32
 
         self.le = LabelBinarizer()
 
@@ -100,8 +102,6 @@ class NeuralNetwork:
             data["label"]
         )  # np array of onehotencoded lables.
         self.num_classes = self.labels.shape[1]
-        with open("data/labels.ls", "w") as lbl:
-            lbl.writelines(self.le.classes_ + "\n")
 
     def train_test_data(self, data: pd.DataFrame) -> None:
         self.tokenizer = "bert-base-uncased"
@@ -131,13 +131,15 @@ class NeuralNetwork:
 
     def save_model(self, output: str = "models/classifier.keras") -> None:
         self.network.save(output)
+        with open(output + ".lb", "w") as lbl:
+            lbl.writelines(self.le.classes_ + "\n")
 
     def train(self, batch_size: int = 24, epochs: int = 50) -> None:
         self.history = self.network.fit(
             self.X_train,
             self.y_train,
             validation_data=(self.X_test, self.y_test),
-            batch_size=batch_size,  # Add this instead of steps_per_epoch
+            batch_size=self.batch_size,  # Add this instead of steps_per_epoch
             epochs=epochs,
             callbacks=self.callbacks,
             class_weight=self.compute_class_weights(
@@ -146,5 +148,32 @@ class NeuralNetwork:
             verbose=1,
         )
 
-    def load_model(self, model: str) -> None:
+    def load_model(self, model: str, labels: str) -> None:
         self.network = load_model(model)
+
+        with open(labels, "r") as lbl:
+            label_list = lbl.readlines()
+        self.labels = [l.replace("\n", "") for l in label_list]
+
+    def predict(self, vectors: List[str]) -> List[str]:
+        if self.network is None:
+            print("No model initialized")
+            return
+
+        try:
+            if self.__autotokenizer is None:
+                self.tokenizer = "bert-base-uncased"
+
+            tokens = self.__autotokenizer(
+                [standardize_text(x) for x in vectors],
+                truncation=True,
+                padding="max_length",
+                max_length=self.token_vector_max_lenght,
+                return_attention_mask=True,
+            )
+            text_vectors = np.array(tokens.get("input_ids"), dtype=int)
+            predictions = self.network.predict(text_vectors, batch_size=self.batch_size)
+            return self.labels[np.argmax(predictions, axis=1)[0]]
+            # TODO: vector of resutls,
+        except Exception as e:
+            raise e
