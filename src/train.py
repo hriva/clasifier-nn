@@ -13,12 +13,10 @@ from tensorflow.keras.layers import (
     LayerNormalization,
 )
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.callbacks import ModelCheckpoint
 from transformers import AutoTokenizer
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 import tensorflow as tf
-
-data = pd.read_parquet("data/data_min002.parquet")
 
 
 class NeuralNetwork:
@@ -27,9 +25,7 @@ class NeuralNetwork:
         self.token_vector_max_lenght = 256
         self.x_inputs = []
         self.__tokenizer = "bert-base-uncased"
-        self.__autotokenizer = AutoTokenizer.from_pretrained(
-            self.__tokenizer
-        )  #  WordPiece: BERT
+        self.__autotokenizer = None
 
         self.le = LabelBinarizer()
 
@@ -108,6 +104,7 @@ class NeuralNetwork:
             lbl.writelines(self.le.classes_ + "\n")
 
     def train_test_data(self, data: pd.DataFrame) -> None:
+        self.tokenizer = "bert-base-uncased"
         self.x_inputs = self.__autotokenizer(
             list(data["text"]),
             truncation=True,
@@ -126,8 +123,6 @@ class NeuralNetwork:
         )
 
     def compute_class_weights(self, y):
-        from sklearn.utils.class_weight import compute_class_weight
-
         y_integers = np.argmax(y, axis=1)
         class_weights = compute_class_weight(
             class_weight="balanced", classes=np.unique(y_integers), y=y_integers
